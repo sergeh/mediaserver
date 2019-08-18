@@ -1,58 +1,165 @@
 version: "3.6"
 services:
-  portainer:
-    image: portainer/portainer
-    hostname: portainer
-    container_name: portainer
-    restart: always
-    command: --templates http://templates/templates.json
-    ports:
-      - "XXXX:9000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${USERDIR}/docker/portainer/data:/data
-      - ${USERDIR}/docker/shared:/shared
+  airsonic:
+    container_name: airsonic
+    image: linuxserver/airsonic
     environment:
-      - TZ=${TZ}
-  organizr:
-    container_name: organizr
-    hostname: organizr
-    restart: always
-    image: lsiocommunity/organizr
-    volumes:
-      - ${USERDIR}/docker/organizr:/config
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:80"
-    environment:
-      - PUID=${PUID}
       - PGID=${PGID}
+      - PUID=${PUID}
       - TZ=${TZ}
-  phpmyadmin:
-    hostname: phpmyadmin
-    container_name: phpmyadmin
-    image: phpmyadmin/phpmyadmin
-    restart: always
-    links:
-      - mariadb:db
-    ports:
-      - XXXX:80
-    environment:
-      - PMA_HOST=mariadb
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-  watchtower:
-    container_name: watchtower
-    hostname: watchtower
-    restart: always
-    image: v2tec/watchtower
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --schedule "0 0 4 * * *" --cleanup
+      - /etc/localtime:/etc/localtime:ro
+      - ${USERDIR}/docker/airsonic:/config\
+      - ${MEDIADIR_MUSIC}:/music
+      - ${MEDIADIR_MUSIC}/playlists:/playlists
+      - ${MEDIADIR_MUSIC}/podcasts:/podcasts
+    ports:
+      - ${AIRSONIC_PORT_4040}:4040
+  bazarr:
+    container_name: bazarr
+    mage: linuxserver/bazarr
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/bazarr:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${MEDIADIR_MOVIES}:/movies
+      - ${MEDIADIR_TV}:/tv
+    ports:
+      - ${BAZARR_PORT_6767}:6767
+  beets: # Music library manager and MusicBrainz tagger
+    container_name: beets
+    image: linuxserver/beets
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/beets:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${DOWNLOADSDIR}:/data
+      - ${DOWNLOADSDIR}:/downloads
+      - ${MEDIADIR_MUSIC}:/music
+    ports:
+      - ${BEETS_PORT_8337}:8337
+  booksonic: # Web-based streamer for your audiobooks.
+    container_name: booksonic
+    image: linuxserver/booksonic
+    environment:
+      - CONTEXT_PATH=${BOOKSONIC_CONTEXT_PATH}
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/booksonic:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${MEDIADIR_AUDIOBOOKS}:/audiobooks
+      - ${MEDIADIR_MUSIC}/podcasts:/podcasts
+    ports:
+      - ${BOOKSONIC_PORT_4040}:4040
+  emby: # Organize, play, and stream audio and video
+    container_name: emby
+    image: linuxserver/emby
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/emby:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${EMBY_TRANSCODEDIR}:/transcode
+      - ${MEDIADIR_MOVIES}:/data/movies
+      - ${MEDIADIR_MOVIES}:/movies
+      - ${MEDIADIR_MUSIC}:/data/music
+      - ${MEDIADIR_MUSIC}:/music
+      - ${MEDIADIR_TV}:/data/tvshow
+      - ${MEDIADIR_TV}:/tv
+    ports:
+      - ${EMBY_PORT_8096}:8096
+      - ${EMBY_PORT_8920}:8920
+  # headphones: # Music PVR Client
+  #   container_name: headphones
+  #   image: linuxserver/headphones
+  #   environment:
+  #     - PGID=${PGID}
+  #     - PUID=${PUID}
+  #     - TZ=${TZ}
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-file: ${DOCKERLOGGING_MAXFILE}
+  #       max-size: ${DOCKERLOGGING_MAXSIZE}
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - ${DOCKERCONFDIR}/headphones:/config
+  #     - ${DOCKERSHAREDDIR}:/shared
+  #     - ${DOWNLOADSDIR}:/data
+  #     - ${DOWNLOADSDIR}:/downloads
+  #     - ${MEDIADIR_MUSIC}:/music
+  #   ports:
+  #     - ${HEADPHONES_PORT_8181}:8181
+  heimdall: # Application dashboard and launcher
+    container_name: heimdall
+    image: linuxserver/heimdall
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/heimdall:/config
+      - ${DOCKERSHAREDDIR}:/shared
+    ports:
+      - ${HEIMDALL_PORT_443}:443
+      - ${HEIMDALL_PORT_80}:80
   homeassistant:
     container_name: homeassistant
+    image: homeassistant/home-assistant
     hostname: hass
     restart: always
-    image: homeassistant/home-assistant
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0
       - /dev/ttyUSB1:/dev/ttyUSB1
@@ -68,13 +175,145 @@ services:
       - PUID=${PUID}
       - PGID=${PGID}
       - TZ=${TZ}
-  nodered:
-    container_name: nodered
-    image: nodered/node-red-docker
-    ports:
-      - "XXXX:1880"
+  # hydra:
+  #   image: "linuxserver/hydra"
+  #   hostname: hydra
+  #   container_name: "hydra"
+  #   volumes:
+  #     - ${USERDIR}/docker/hydra:/config
+  #     - ${USERDIR}/Downloads:/downloads
+  #     - ${USERDIR}/docker/shared:/shared
+  #   ports:
+  #     - "XXXX:5075"
+  #   restart: always
+  #   environment:
+  #     - PUID=${PUID}
+  #     - PGID=${PGID}
+  #     - TZ=${TZ} 
+  hydra2: # Meta search for NZB indexers
+    container_name: hydra2
+    image: linuxserver/hydra2
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
     volumes:
-      - ${USERDIR}/docker/nodered:/data
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/hydra2:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${DOWNLOADSDIR}:/data
+      - ${DOWNLOADSDIR}:/downloads
+    ports:
+      - ${HYDRA2_PORT_5076}:5076
+  jackett: # API Support for your favorite private trackers
+    image: "linuxserver/jackett"
+    hostname: jackett
+    container_name: "jackett"
+    volumes:
+      - ${USERDIR}/docker/jackett:/config
+      - ${USERDIR}/Downloads/completed:/downloads
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:9117"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  lazylibrarian: # Book PVR Client
+    container_name: lazylibrarian
+    image: linuxserver/lazylibrarian
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/lazylibrarian:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${DOWNLOADSDIR}:/data
+      - ${DOWNLOADSDIR}:/downloads
+      - ${MEDIADIR_AUDIOBOOKS}:/audiobooks
+      - ${MEDIADIR_BOOKS}:/books
+    ports:
+      - ${LAZYLIBRARIAN_PORT_5299}:5299
+  letsencrypt:
+    cap_add:
+      - NET_ADMIN
+    container_name: letsencrypt
+    image: linuxserver/letsencrypt
+    environment:
+      - DNSPLUGIN=${LETSENCRYPT_DNSPLUGIN}
+      - DUCKDNSTOKEN=${LETSENCRYPT_DUCKDNSTOKEN}
+      - EMAIL=${LETSENCRYPT_EMAIL}
+      - EXTRA_DOMAINS=${LETSENCRYPT_EXTRA_DOMAINS}
+      - ONLY_SUBDOMAINS=${LETSENCRYPT_ONLY_SUBDOMAINS}
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - SUBDOMAINS=${LETSENCRYPT_SUBDOMAINS}
+      - TZ=${TZ}
+      - URL=${LETSENCRYPT_URL}
+      - VALIDATION=${LETSENCRYPT_VALIDATION}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/letsencrypt:/config
+      - ${DOCKERSHAREDDIR}:/shared
+    ports:
+      - ${LETSENCRYPT_PORT_443}:443
+      - ${LETSENCRYPT_PORT_80}:80
+  lidarr:
+    image: "linuxserver/lidarr"
+    hostname: lidarr
+    container_name: "lidarr"
+    volumes:
+      - ${USERDIR}/docker/lidarr:/config
+      - ${USERDIR}/Downloads:/downloads
+      - ${USERDIR}/media/music:/music
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:8686"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  mariadb:
+    image: "linuxserver/mariadb"
+    container_name: "mariadb"
+    hostname: mariadb
+    volumes:
+        - ${USERDIR}/docker/mariadb:/config
+    ports:
+      - target: 3306
+        published: 3306
+        protocol: tcp
+        mode: host
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
   mqtt:
     container_name: mqtt
     image: toke/mosquitto
@@ -85,6 +324,245 @@ services:
       - ${USERDIR}/docker/mqtt/config:/mqtt/config:ro
       - ${USERDIR}/docker/mqtt/log:/mqtt/log
       - ${USERDIR}/docker/mqtt/data:/mqtt/data
+  nodered:
+    container_name: nodered
+    image: nodered/node-red-docker
+    ports:
+      - "XXXX:1880"
+    volumes:
+      - ${USERDIR}/docker/nodered:/data
+  ombi: # Allow your users to Request Movies, TV Shows and Albums
+    container_name: ombi
+    hostname: ombi
+    restart: always
+    image: linuxserver/ombi
+    volumes:
+      - ${USERDIR}/docker/ombi:/config
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:3579"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  organizr: # HTPC/Homelab Services Organizer
+    container_name: organizr
+    hostname: organizr
+    restart: always
+    image: lsiocommunity/organizr
+    volumes:
+      - ${USERDIR}/docker/organizr:/config
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:80"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  ouroboros: # Automatically update running Docker containers
+    container_name: ouroboros
+    environment:
+      - CLEANUP=${OUROBOROS_CLEANUP}
+      - CRON=${OUROBOROS_CRON}
+      - IGNORE=${OUROBOROS_IGNORE}
+      - INTERVAL=${OUROBOROS_INTERVAL}
+      - LOG_LEVEL=${OUROBOROS_LOG_LEVEL}
+      - MONITOR=${OUROBOROS_MONITOR}
+      - NOTIFIERS=${OUROBOROS_NOTIFIERS}
+      - REPO_PASS=${OUROBOROS_REPO_PASS}
+      - REPO_USER=${OUROBOROS_REPO_USER}
+      - SELF_UPDATE=${OUROBOROS_SELF_UPDATE}
+      - TZ=${TZ}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKERSHAREDDIR}:/shared
+  pihole: # A black hole for internet advertisements
+    cap_add:
+      - NET_ADMIN
+    container_name: pihole
+    image: pihole/pihole
+    dns:
+      - 127.0.0.1
+      - ${NS1}
+      - ${NS2}
+    environment:
+      - DNS1=${NS1}
+      - DNS2=${NS2}
+      - ServerIP=${PIHOLE_SERVERIP}
+      - ServerIPv6=${PIHOLE_SERVERIPV6}
+      - TZ=${TZ}
+      - WEBPASSWORD=${PIHOLE_WEBPASSWORD}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/pihole/dnsmasq.d:/etc/dnsmasq.d
+      - ${DOCKERCONFDIR}/pihole/pihole:/etc/pihole
+      - ${DOCKERSHAREDDIR}:/shared
+  plex:
+    container_name: plex
+    image: linuxserver/plex
+    environment:
+      - PGID=${PGID}
+      - PUID=${PUID}
+      - TZ=${TZ}
+      - VERSION=${PLEX_VERSION}
+    logging:
+      driver: json-file
+      options:
+        max-file: ${DOCKERLOGGING_MAXFILE}
+        max-size: ${DOCKERLOGGING_MAXSIZE}
+    restart: unless-stopped
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${DOCKERCONFDIR}/plex:/config
+      - ${DOCKERSHAREDDIR}:/shared
+      - ${MEDIADIR_MOVIES}:/data/movies
+      - ${MEDIADIR_MOVIES}:/movies
+      - ${MEDIADIR_MUSIC}:/data/music
+      - ${MEDIADIR_MUSIC}:/music
+      - ${MEDIADIR_TV}:/data/tv
+      - ${MEDIADIR_TV}:/tv
+      - ${PLEX_TRANSCODEDIR}:/transcode
+    ports:
+      - "32400:32400/tcp"
+      - "3005:3005/tcp"
+      - "8324:8324/tcp"
+      - "32469:32469/tcp"
+      - "1900:1900/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+  # plexms:
+  #   container_name: plexms
+  #   hostname: plexms
+  #   restart: always
+  #   image: plexinc/pms-docker
+  #   volumes:
+  #     - ${USERDIR}/docker/plexms:/config
+  #     - ${USERDIR}/Downloads/plex_tmp:/transcode
+  #     - /media/media:/media
+  #     - ${USERDIR}/docker/shared:/shared
+  #   ports:
+  #     - "32400:32400/tcp"
+  #     - "3005:3005/tcp"
+  #     - "8324:8324/tcp"
+  #     - "32469:32469/tcp"
+  #     - "1900:1900/udp"
+  #     - "32410:32410/udp"
+  #     - "32412:32412/udp"
+  #     - "32413:32413/udp"
+  #     - "32414:32414/udp"
+  #   environment:
+  #     - TZ=${TZ}
+  #     - HOSTNAME="Docker Plex"
+  #     - PLEX_CLAIM="claim-YYYYYYYYY"
+  #     - PLEX_UID=${PUID}
+  #     - PLEX_GID=${PGID}
+  #     - ADVERTISE_IP="http://SERVER-IP:32400/"
+  portainer:
+    image: portainer/portainer
+    hostname: portainer
+    container_name: portainer
+    restart: unless-stopped
+    command: --templates http://templates/templates.json
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${USERDIR}/docker/portainer/data:/data
+      - ${USERDIR}/docker/shared:/shared
+    environment:
+      - TZ=${TZ}
+  phpmyadmin:
+    hostname: phpmyadmin
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    links:
+      - mariadb:db
+    ports:
+      - XXXX:80
+    environment:
+      - PMA_HOST=mariadb
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+  radarr:
+    image: "linuxserver/radarr"
+    hostname: radarr
+    container_name: "radarr"
+    volumes:
+      - ${USERDIR}/docker/radarr:/config
+      - ${USERDIR}/Downloads/completed:/downloads
+      - ${USERDIR}/media/movies:/movies
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:7878"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  sabnzbd:
+    image: "linuxserver/sabnzbd"
+    hostname: sabnzbd
+    container_name: "sabnzbd"
+    volumes:
+      - ${USERDIR}/docker/sabnzbd:/config
+      - ${USERDIR}/Downloads/completed:/downloads
+      - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+        - "XXXX:8080"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  sonarr:
+    image: "linuxserver/sonarr"
+    hostname: sonarr
+    container_name: "sonarr"
+    volumes:
+      - ${USERDIR}/docker/sonarr:/config
+      - ${USERDIR}/Downloads/completed:/downloads
+      - ${USERDIR}/media/tvshows:/tv
+      - "/etc/localtime:/etc/localtime:ro"
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+        - "XXXX:8989"
+    restart: always
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+  tautulli:
+    container_name: tautulli
+    hostname: tautulli
+    restart: always
+    image: linuxserver/tautulli
+    volumes:
+      - ${USERDIR}/docker/tautulli/config:/config
+      - ${USERDIR}/docker/tautulli/logs:/logs:ro
+      - ${USERDIR}/docker/shared:/shared
+    ports:
+      - "XXXX:8181"
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
   transmission-vpn:
     container_name: transmission-vpn
     hostname: transmission
@@ -135,174 +613,11 @@ services:
       - TRANSMISSION_WATCH_DIR=/downloads
       - TRANSMISSION_WATCH_DIR_ENABLED=true
       - TRANSMISSION_DOWNLOAD_DIR=/downloads/completed
-  sabnzbd:
-    image: "linuxserver/sabnzbd"
-    hostname: sabnzbd
-    container_name: "sabnzbd"
-    volumes:
-      - ${USERDIR}/docker/sabnzbd:/config
-      - ${USERDIR}/Downloads/completed:/downloads
-      - ${USERDIR}/Downloads/incomplete:/incomplete-downloads
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-        - "XXXX:8080"
+  watchtower:
+    container_name: watchtower
+    hostname: watchtower
     restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  radarr:
-    image: "linuxserver/radarr"
-    hostname: radarr
-    container_name: "radarr"
+    image: v2tec/watchtower
     volumes:
-      - ${USERDIR}/docker/radarr:/config
-      - ${USERDIR}/Downloads/completed:/downloads
-      - ${USERDIR}/media/movies:/movies
-      - "/etc/localtime:/etc/localtime:ro"
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:7878"
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  sonarr:
-    image: "linuxserver/sonarr"
-    hostname: sonarr
-    container_name: "sonarr"
-    volumes:
-      - ${USERDIR}/docker/sonarr:/config
-      - ${USERDIR}/Downloads/completed:/downloads
-      - ${USERDIR}/media/tvshows:/tv
-      - "/etc/localtime:/etc/localtime:ro"
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-        - "XXXX:8989"
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  lidarr:
-    image: "linuxserver/lidarr"
-    hostname: lidarr
-    container_name: "lidarr"
-    volumes:
-      - ${USERDIR}/docker/lidarr:/config
-      - ${USERDIR}/Downloads:/downloads
-      - ${USERDIR}/media/music:/music
-      - "/etc/localtime:/etc/localtime:ro"
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:8686"
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  plexms:
-    container_name: plexms
-    hostname: plexms
-    restart: always
-    image: plexinc/pms-docker
-    volumes:
-      - ${USERDIR}/docker/plexms:/config
-      - ${USERDIR}/Downloads/plex_tmp:/transcode
-      - /media/media:/media
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "32400:32400/tcp"
-      - "3005:3005/tcp"
-      - "8324:8324/tcp"
-      - "32469:32469/tcp"
-      - "1900:1900/udp"
-      - "32410:32410/udp"
-      - "32412:32412/udp"
-      - "32413:32413/udp"
-      - "32414:32414/udp"
-    environment:
-      - TZ=${TZ}
-      - HOSTNAME="Docker Plex"
-      - PLEX_CLAIM="claim-YYYYYYYYY"
-      - PLEX_UID=${PUID}
-      - PLEX_GID=${PGID}
-      - ADVERTISE_IP="http://SERVER-IP:32400/"
-  tautulli:
-    container_name: tautulli
-    hostname: tautulli
-    restart: always
-    image: linuxserver/tautulli
-    volumes:
-      - ${USERDIR}/docker/tautulli/config:/config
-      - ${USERDIR}/docker/tautulli/logs:/logs:ro
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:8181"
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}  
-  ombi:
-    container_name: ombi
-    hostname: ombi
-    restart: always
-    image: linuxserver/ombi
-    volumes:
-      - ${USERDIR}/docker/ombi:/config
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:3579"
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  hydra:
-    image: "linuxserver/hydra"
-    hostname: hydra
-    container_name: "hydra"
-    volumes:
-      - ${USERDIR}/docker/hydra:/config
-      - ${USERDIR}/Downloads:/downloads
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:5075"
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ} 
-  jackett:
-    image: "linuxserver/jackett"
-    hostname: jackett
-    container_name: "jackett"
-    volumes:
-      - ${USERDIR}/docker/jackett:/config
-      - ${USERDIR}/Downloads/completed:/downloads
-      - "/etc/localtime:/etc/localtime:ro"
-      - ${USERDIR}/docker/shared:/shared
-    ports:
-      - "XXXX:9117"
-    restart: always
-    environment:
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
-  mariadb:
-    image: "linuxserver/mariadb"
-    container_name: "mariadb"
-    hostname: mariadb
-    volumes:
-        - ${USERDIR}/docker/mariadb:/config
-    ports:
-      - target: 3306
-        published: 3306
-        protocol: tcp
-        mode: host
-    restart: always
-    environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - PUID=${PUID}
-      - PGID=${PGID}
-      - TZ=${TZ}
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --schedule "0 0 4 * * *" --cleanup
